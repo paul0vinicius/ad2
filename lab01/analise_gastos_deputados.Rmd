@@ -1,0 +1,94 @@
+---
+title: "Análise de Gastos de Deputados"
+author: "Paulo Vinicius Soares"
+date: "25 de outubro de 2017"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 4
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(tidyverse)
+```
+
+```{r, message=FALSE, warning=FALSE}
+dadosCEAP <- read_csv(unz("../database/dadosCEAP.csv.zip", "dadosCEAP.csv"))
+dadosCEAP$valorGlosa <- as.numeric(sub(",", ".", dadosCEAP$valorGlosa, fixed = TRUE)) 
+```
+
+# Primeira pergunta: Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas considerando valores em R$.
+
+Gráfico dos partidos por uso da CEAP
+```{r}
+dadosCEAP %>%
+  group_by(sgPartido) %>%
+  summarise(n=n()) %>%
+  ggplot(aes(x=sgPartido,y=n)) + geom_bar(stat="identity") + coord_flip()
+```
+
+Gráfico dos gastos dos partidos por uso da CEAP
+```{r}
+dadosCEAP %>%
+  group_by(sgPartido) %>%
+  summarise(valorGastos = sum(valorLíquido)) %>%
+  ggplot(aes(x = sgPartido, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+```
+
+# Segunda pergunta: Quais os tipos de despesa mais comuns no uso da CEAP? Mesma pergunta considerando valores em R$.
+Gráfico dos tipos de despesa da CEAP
+```{r}
+dadosCEAP %>%
+  group_by(tipoDespesa) %>%
+  summarise(n=n()) %>%
+  ggplot(aes(x=tipoDespesa,y=n)) + geom_bar(stat="identity") + coord_flip()
+```
+
+
+Gráfico dos gastos por tipo de despesa
+```{r}
+dadosCEAP %>%
+  group_by(tipoDespesa) %>%
+  summarise(valorGastos = sum(valorLíquido)) %>%
+  ggplot(aes(x = tipoDespesa, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+```
+
+# Terceira pergunta: Levando em conta o estado pelo qual o deputado se elegeu, quais os estados que mais fazem uso da CEAP? Quais os que menos fazem uso? Mesmas perguntas considerando gastos em R$. Por que você acha isso?
+Gráfico de utilização por estado
+```{r}
+dadosCEAP %>%
+  group_by(sgUF) %>%
+  summarise(n=n()) %>%
+  ggplot(aes(x=sgUF,y=n)) + geom_bar(stat="identity") + coord_flip()
+```
+
+Gráfico dos gastos por estado
+```{r}
+dadosCEAP %>%
+  group_by(sgUF) %>%
+  summarise(valorGastos = sum(valorLíquido)) %>%
+  ggplot(aes(x = sgUF, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+```
+
+# Quarta pergunta: Quais os parlamentares que mais gastam com CEAP e quais os que menos gastam?
+```{r}
+dadosCEAP %>%
+  group_by(nomeParlamentar) %>%
+  summarise(valorGastos = sum(valorLíquido))
+```
+
+# Quinta pergunta: Existe correlação entre a quantidade de gastos no exterior e o valor restituído da CEAP? 
+```{r}
+
+```
+
+# Perguntas bônus
+
+## Quais os estados cujos deputados gastam mais no exterior? Quais os estados cujos deputados gastam menos no exterior?
+
+## Quais os deputados que mais ultrapassam o limite de CEAP do seu estado?
+
+
+
