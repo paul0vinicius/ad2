@@ -17,6 +17,7 @@ library(tidyverse)
 ```{r, message=FALSE, warning=FALSE}
 dadosCEAP <- read_csv(unz("../database/dadosCEAP.csv.zip", "dadosCEAP.csv"))
 dadosCEAP$valorGlosa <- as.numeric(sub(",", ".", dadosCEAP$valorGlosa, fixed = TRUE)) 
+limiteMensalCEAP <- read_csv("../database/limiteMensalCEAP.csv")
 ```
 
 # Primeira pergunta: Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas considerando valores em R$.
@@ -74,21 +75,81 @@ dadosCEAP %>%
 
 # Quarta pergunta: Quais os parlamentares que mais gastam com CEAP e quais os que menos gastam?
 ```{r}
-dadosCEAP %>%
+dados <- dadosCEAP %>%
   group_by(nomeParlamentar) %>%
   summarise(valorGastos = sum(valorLíquido))
+
+# Os que mais gastaram
+dados[order(-dados$valorGastos),] %>%
+  head(10) %>%
+  ggplot(aes(x = nomeParlamentar, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+
+# Os que mais retornaram dinheiro
+dados[order(dados$valorGastos),] %>%
+  head(10) %>%
+  ggplot(aes(x = nomeParlamentar, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+
+# Os que menos gastaram
+dados[order(dados$valorGastos),] %>%
+  filter(valorGastos > 0) %>%
+  head(10) %>%
+  ggplot(aes(x = nomeParlamentar, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+  
 ```
 
 # Quinta pergunta: Existe correlação entre a quantidade de gastos no exterior e o valor restituído da CEAP? 
 ```{r}
-
+dadosCEAP %>%
+  group_by(tipoDocumento) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = as.factor(tipoDocumento), y = n)) + geom_bar(stat="identity")
 ```
 
 # Perguntas bônus
 
 ## Quais os estados cujos deputados gastam mais no exterior? Quais os estados cujos deputados gastam menos no exterior?
+```{r}
+estados_custos_exterior <- dadosCEAP %>%
+  group_by(tipoDocumento, sgUF) %>%
+  filter(tipoDocumento==2) %>%
+  summarise(n = n())
+
+# Quantidade (mais)
+estados_custos_exterior[order(-estados_custos_exterior$n),] %>%
+  head(10)
+
+# Quantidade (menos)
+estados_custos_exterior[order(estados_custos_exterior$n),] %>%
+  head(10)
+
+# Reais (mais)
+estados_custos_reais_exterior <- dadosCEAP %>%
+  filter(tipoDocumento==2) %>%
+  group_by(sgUF) %>%
+  summarise(gastos=sum(valorLíquido))
+
+estados_custos_reais_exterior[order(-estados_custos_reais_exterior$gastos),] %>%
+  head(10)
+
+# Reais (menos)
+estados_custos_reais_exterior[order(estados_custos_reais_exterior$gastos),] %>%
+  head(10)
+```
+
 
 ## Quais os deputados que mais ultrapassam o limite de CEAP do seu estado?
+```{r}
+dadosCEAP %>%
+  group_by(nomeParlamentar, sgUF) %>%
+  summarise(gastosDeputado=sum(valorLíquido)) %>%
+  left_join(limiteMensalCEAP, by=c("sgUF" = "UF")) %>%
+  mutate(limite_mensal = 24*limite_mensal) %>%
+  filter(gastosDeputado > limite_mensal)
+
+dadosCEAP %>%
+  mutate()
+```
+
 
 
 
