@@ -15,10 +15,22 @@ library(tidyverse)
 ```
 
 ```{r, message=FALSE, warning=FALSE}
-dadosCEAP <- read_csv(unz("../database/dadosCEAP.csv.zip", "dadosCEAP.csv"))
+dadosCEAP <- read_csv(unz("../database/dadosCEAP.csv.zip", "dadosCEAP.csv")) %>%
+  mutate(diaMesAno = as.Date(stringr::str_sub(dataEmissao,1,10)))
+  
 dadosCEAP$valorGlosa <- as.numeric(sub(",", ".", dadosCEAP$valorGlosa, fixed = TRUE)) 
 limiteMensalCEAP <- read_csv("../database/limiteMensalCEAP.csv")
 ```
+
+# Teste da data
+```{r}
+data <- dadosCEAP %>%
+  select(dataEmissao)
+  
+data %>%
+  
+```
+
 
 # Primeira pergunta: Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas considerando valores em R$.
 
@@ -36,6 +48,18 @@ dadosCEAP %>%
   group_by(sgPartido) %>%
   summarise(valorGastos = sum(valorLíquido)) %>%
   ggplot(aes(x = sgPartido, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+```
+
+Boxplot dos partidos
+```{r}
+
+partidos <- dadosCEAP$sgPartido %>%
+  unique()
+
+dadosCEAP %>%
+  filter(valorDocumento > 10000) %>%
+  filter(sgPartido %in% partidos[1:5]) %>%
+  ggplot(aes(x = sgPartido, y = valorDocumento)) + geom_boxplot() + coord_flip()
 ```
 
 # Segunda pergunta: Quais os tipos de despesa mais comuns no uso da CEAP? Mesma pergunta considerando valores em R$.
@@ -103,6 +127,13 @@ dadosCEAP %>%
   group_by(tipoDocumento) %>%
   summarise(n = n()) %>%
   ggplot(aes(x = as.factor(tipoDocumento), y = n)) + geom_bar(stat="identity")
+
+dadosCEAP %>%
+  filter(tipoDocumento==2) %>%
+  group_by(nomeParlamentar) %>%
+  summarise(numeroGastos = n(), valorRestituido = sum(valorLíquido)) %>%
+  select(numeroGastos, valorRestituido) %>%
+  cor()
 ```
 
 # Perguntas bônus
