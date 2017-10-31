@@ -14,6 +14,10 @@ library(readr)
 library(tidyverse)
 ```
 
+# Introdução
+Esta análise será feita utilizando os dados de gastos da _Cota Parlamentar_ dos deputados. Abaixo temos 5 perguntas que iremos responder a partir dos nossos dados.
+
+Antes, iremos importar a nossa base de dados.
 ```{r, message=FALSE, warning=FALSE}
 dadosCEAP <- read_csv(unz("../database/dadosCEAP.csv.zip", "dadosCEAP.csv")) %>%
   mutate(diaMesAno = as.Date(stringr::str_sub(dataEmissao,1,10)))
@@ -22,62 +26,62 @@ dadosCEAP$valorGlosa <- as.numeric(sub(",", ".", dadosCEAP$valorGlosa, fixed = T
 limiteMensalCEAP <- read_csv("../database/limiteMensalCEAP.csv")
 ```
 
-# Teste da data
-```{r}
-data <- dadosCEAP %>%
-  select(dataEmissao)
-  
-data %>%
-  
-```
-
-
 # Primeira pergunta: Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas considerando valores em R$.
 
-Gráfico dos partidos por uso da CEAP
+Abaixo temos um gráfico dos partidos por uso da CEAP.
 ```{r}
 dadosCEAP %>%
   group_by(sgPartido) %>%
   summarise(n=n()) %>%
   ggplot(aes(x=sgPartido,y=n)) + geom_bar(stat="identity") + coord_flip()
 ```
+Analisando o gráfico acima temos que os maiores gastos advém do PT, PMDB e PSDB. Temos que considerar também o número de deputados que cada partido possui. Esses três partidos possuem um número muito maior de deputados em relação aos demais partidos.
 
-Gráfico dos gastos dos partidos por uso da CEAP
+Analisando agora o gráfico dos gastos dos partidos por uso da CEAP, temos:
 ```{r}
 dadosCEAP %>%
   group_by(sgPartido) %>%
-  summarise(valorGastos = sum(valorLíquido)) %>%
+  summarise(valorGastos = sum(valorDocumento)) %>%
   ggplot(aes(x = sgPartido, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
 ```
+O partido que mais gastou com a CEAP foi o PMDB, seguido pelo PT e seguido pelo PSDB e PP com uma diferença muito ínfima entre os dois.
 
-Boxplot dos partidos
+Podemos analisar a distribuição através de um _boxplot_ dos partidos:
 ```{r}
 
 partidos <- dadosCEAP$sgPartido %>%
   unique()
 
 dadosCEAP %>%
-  filter(valorDocumento > 10000) %>%
-  filter(sgPartido %in% partidos[1:5]) %>%
-  ggplot(aes(x = sgPartido, y = valorDocumento)) + geom_boxplot() + coord_flip()
+  filter(valorDocumento > 20000) %>%
+  ggplot(aes(x = sgPartido, y = valorDocumento)) + geom_boxplot(outlier.alpha = 0) + coord_flip()
 ```
+Analisando o gráfico temos que o PSL apresentou maior gasto mediano com a CEAP e o partido _Solidariedade_ (SD) apresenta a maior variação entre os gastos.
 
 # Segunda pergunta: Quais os tipos de despesa mais comuns no uso da CEAP? Mesma pergunta considerando valores em R$.
-Gráfico dos tipos de despesa da CEAP
+Analisando agora o gráfico dos tipos de despesa da CEAP por utilização, temos:
 ```{r}
 dadosCEAP %>%
   group_by(tipoDespesa) %>%
   summarise(n=n()) %>%
   ggplot(aes(x=tipoDespesa,y=n)) + geom_bar(stat="identity") + coord_flip()
 ```
+A emissão de bilhete aéreo é o grande responsável pelos gastos dos deputados, seguidos de combustíveis e lubrificante. Essa medida se dá em valor absoluto.
 
-
-Gráfico dos gastos por tipo de despesa
+Analisando agora o gráfico dos tipos de despesa da CEAP pelo valor dos gastos, temos:
 ```{r}
 dadosCEAP %>%
   group_by(tipoDespesa) %>%
   summarise(valorGastos = sum(valorLíquido)) %>%
   ggplot(aes(x = tipoDespesa, y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+```
+A divulgação da atividade parlamentar é a maior responsável pelos gastos na CEAP, seguida pela emissão de bilhete aéreo.
+
+Se dermos uma olhada na distribuição dos gastos através de um _boxplot_, temos:
+```{r}
+dadosCEAP %>%
+  ggplot(aes(x = tipoDespesa, y = valorDocumento)) + geom_boxplot(outlier.alpha = 0) + coord_flip()
+  
 ```
 
 # Terceira pergunta: Levando em conta o estado pelo qual o deputado se elegeu, quais os estados que mais fazem uso da CEAP? Quais os que menos fazem uso? Mesmas perguntas considerando gastos em R$. Por que você acha isso?
