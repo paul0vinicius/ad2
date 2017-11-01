@@ -11,6 +11,7 @@ output:
 
 ```{r, message=FALSE, warning=FALSE}
 library(readr)
+library(knitr)
 library(tidyverse)
 ```
 
@@ -26,7 +27,9 @@ dadosCEAP$valorGlosa <- as.numeric(sub(",", ".", dadosCEAP$valorGlosa, fixed = T
 limiteMensalCEAP <- read_csv("../database/limiteMensalCEAP.csv")
 ```
 
-# Primeira pergunta: Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas considerando valores em R$.
+# Perguntas
+
+## 1. Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas considerando valores em R$.
 
 Abaixo temos um gráfico dos partidos por uso da CEAP.
 ```{r}
@@ -35,6 +38,8 @@ dadosCEAP %>%
   group_by(sgPartido) %>%
   summarise(n = n()) %>%
   ggplot(aes(x = reorder(sgPartido, n), y = n)) + 
+  xlab("Partido") +
+  ylab("Utilização da CEAP") +
   geom_bar(stat = "identity") + 
   coord_flip()
 ```
@@ -47,6 +52,8 @@ dadosCEAP %>%
   group_by(sgPartido) %>%
   summarise(valorGastos = sum(valorDocumento)) %>%
   ggplot(aes(x = reorder(sgPartido, valorGastos), y = valorGastos)) + 
+  xlab("Partido") +
+  ylab("Gastos totais (em reais)") +
   geom_bar(stat="identity") + 
   coord_flip()
 ```
@@ -58,6 +65,8 @@ Podemos analisar a distribuição através de um _boxplot_ dos partidos:
 gastos_partido <- dadosCEAP %>%
   filter(valorDocumento > 0 & !sgPartido %in% NA) %>%
   ggplot(aes(x = sgPartido, y = valorDocumento)) + 
+  xlab("Partido") +
+  ylab("Valor do documento (em reais)") +
   geom_boxplot(outlier.alpha = 0) + 
   coord_flip()
 
@@ -73,13 +82,17 @@ gastos_partido +
 
 Podemos perceber que os valores tendem a estar entre 0 e 200 reais, com algumas exceções de distribuições com maior variação, tais como ocorre no _PRP_. A mediana dos valores é aproximadamente 100 reais.
 
-# Segunda pergunta: Quais os tipos de despesa mais comuns no uso da CEAP? Mesma pergunta considerando valores em R$.
+## 2. Quais os tipos de despesa mais comuns no uso da CEAP? Mesma pergunta considerando valores em R$.
 Analisando agora o gráfico dos tipos de despesa da CEAP por utilização, temos:
 ```{r}
 dadosCEAP %>%
   group_by(tipoDespesa) %>%
   summarise(n = n()) %>%
-  ggplot(aes(x = reorder(tipoDespesa, n), y = n)) + geom_bar(stat = "identity") + coord_flip()
+  ggplot(aes(x = reorder(tipoDespesa, n), y = n)) + 
+  xlab("Tipo de despesa") +
+  ylab("Utilização da CEAP") +
+  geom_bar(stat = "identity") + 
+  coord_flip()
 ```
 
 A emissão de bilhete aéreo é o grande responsável pelos gastos dos deputados, seguidos de combustíveis e lubrificante. Essa medida se dá em valor absoluto das solicitações de uso da CEAP.
@@ -88,8 +101,12 @@ Analisando agora o gráfico dos tipos de despesa da CEAP pelo valor dos gastos, 
 ```{r}
 dadosCEAP %>%
   group_by(tipoDespesa) %>%
-  summarise(valorGastos = sum(valorLíquido)) %>%
-  ggplot(aes(x = reorder(tipoDespesa, valorGastos), y = valorGastos)) + geom_bar(stat = "identity") + coord_flip()
+  summarise(valorGastos = sum(valorDocumento)) %>%
+  ggplot(aes(x = reorder(tipoDespesa, valorGastos), y = valorGastos)) + 
+  xlab("Tipo de despesa") +
+  ylab("Gastos totais (em reais)") +
+  geom_bar(stat = "identity") + 
+  coord_flip()
 ```
 
 A divulgação da atividade parlamentar é a maior responsável pelos gastos na CEAP, seguida pela emissão de bilhete aéreo.
@@ -98,6 +115,8 @@ Se dermos uma olhada na distribuição dos gastos através de um _boxplot_, temo
 ```{r}
 tipos_gastos <- dadosCEAP %>%
   ggplot(aes(x = tipoDespesa, y = valorDocumento)) + 
+  xlab("Tipo de despesa") +
+  ylab("Valor do documento (em reais)") +
   geom_boxplot(outlier.alpha = 0) + 
   coord_flip()
 tipos_gastos
@@ -110,7 +129,7 @@ tipos_gastos + scale_y_continuous(limits = c(0, 1000))
 
 Participação em curso, palestra ou evento similar apresenta uma grande variação nos preços. Ou seja, os deputados participam de palestras que vão de 100 até 750 reais, geralmente.
 
-# Terceira pergunta: Levando em conta o estado pelo qual o deputado se elegeu, quais os estados que mais fazem uso da CEAP? Quais os que menos fazem uso? Mesmas perguntas considerando gastos em R$. 
+## 3. Levando em conta o estado pelo qual o deputado se elegeu, quais os estados que mais fazem uso da CEAP? Quais os que menos fazem uso? Mesmas perguntas considerando gastos em R$. 
 
 Analisando agora o Gráfico de utilização por estado da CEAP, temos:
 
@@ -119,7 +138,11 @@ dadosCEAP %>%
   filter(!sgUF %in% NA) %>%
   group_by(sgUF) %>%
   summarise(n = n()) %>%
-  ggplot(aes(x = reorder(sgUF, n),y = n)) + geom_bar(stat = "identity") + coord_flip()
+  ggplot(aes(x = reorder(sgUF, n),y = n)) + 
+  xlab("Estado") +
+  ylab("Utilização da CEAP") +
+  geom_bar(stat = "identity") + 
+  coord_flip()
 ```
 
 Pelo gráfico podemos perceber que SP possui o maior número de requisições da CEAP em valores absolutos dos dados analisados. Em segundo lugar, Minas Gerais. Os estados que fazem menos uso são Amapá, Amazonas e Roraima. O Distrito Federal aparece em último, mas não é considerado estado.
@@ -130,15 +153,19 @@ dadosCEAP %>%
   filter(!sgUF %in% NA) %>%
   group_by(sgUF) %>%
   summarise(valorGastos = sum(valorLíquido)) %>%
-  ggplot(aes(x = reorder(sgUF, valorGastos), y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+  ggplot(aes(x = reorder(sgUF, valorGastos), y = valorGastos)) + 
+  xlab("Estado") +
+  ylab("Gastos totais (em reais)") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
 São Paulo continua na liderança dos gastos seguido de Minas Gerais e Rio de Janeiro.
 
-## Por que você acha isso?
+### Por que você acha isso?
 Acredito que a quantidade de deputados de SP influencia nos gastos, pois o número de deputados por estado é equivalente à sua população. Dado isso, SP tem 70 deputados e por isso é o que possui mais gastos.
 
-# Quarta pergunta: Quais os parlamentares que mais gastam com CEAP e quais os que menos gastam?
+## 4. Quais os parlamentares que mais gastam com CEAP e quais os que menos gastam?
 Separando os dados, temos:
 ```{r}
 dados <- dadosCEAP %>%
@@ -151,7 +178,11 @@ _Plotando_ os deputados que mais gastaram, temos:
 # Os que mais gastaram
 dados[order(-dados$valorGastos),] %>%
   head(10) %>%
-  ggplot(aes(x = reorder(nomeParlamentar, valorGastos), y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+  ggplot(aes(x = reorder(nomeParlamentar, valorGastos), y = valorGastos)) + 
+  xlab("Deputado") +
+  ylab("Gastos totais (em reais)") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
 Os que menos gastaram, temos:
@@ -160,12 +191,16 @@ Os que menos gastaram, temos:
 dados[order(dados$valorGastos),] %>%
   filter(valorGastos > 0) %>%
   head(10) %>%
-  ggplot(aes(x = reorder(nomeParlamentar, -valorGastos), y = valorGastos)) + geom_bar(stat="identity") + coord_flip()
+  ggplot(aes(x = reorder(nomeParlamentar, -valorGastos), y = valorGastos)) + 
+  xlab("Deputado") +
+  ylab("Gastos totais (em reais)") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
 Lembrando que essa análise foi feita considerando os valores absolutos, então podem existir deputados que ficaram pouco tempo na câmara enquanto outros estão lá até hoje e continuam se utilizando da CEAP.
 
-# Quinta pergunta: Existe correlação entre a quantidade de gastos no exterior e o valor restituído da CEAP? 
+## 5. Existe correlação entre a quantidade de gastos no exterior e o valor restituído da CEAP? 
 O valor restituído da CEAP é o valor líquido, que é repassado para o deputado após a comprovação da nota fiscal e do valor do documento ser conferido. Dessa forma, o valor é devolvido ao deputado e o gasto é contabilizado em sua cota parlamentar. Agora, verificaremos se há correlação entre o número de solicitações de uso da CEAP e o valor líquido.
 ```{r}
 gastos_deputados_exterior <- dadosCEAP %>%
@@ -180,7 +215,8 @@ gastos_deputados <- dadosCEAP %>%
 gastos_deputados_exterior %>%
   left_join(gastos_deputados, by="nomeParlamentar") %>%
   select(somaGastos, numeroGastos) %>%
-  cor()
+  cor() %>%
+  kable()
 ```
 
 De acordo com o cálculo acima, não existe qualquer correlação entre as duas variáveis.
@@ -188,6 +224,8 @@ De acordo com o cálculo acima, não existe qualquer correlação entre as duas 
 # Perguntas bônus
 
 ## Quais os estados cujos deputados gastam mais no exterior? Quais os estados cujos deputados gastam menos no exterior?
+
+Através de vários gráficos podemos responder essa pergunta.
 ```{r}
 # Quantidade
 estados_custos_exterior <- dadosCEAP %>%
@@ -199,48 +237,55 @@ estados_custos_exterior <- dadosCEAP %>%
 estados_custos_reais_exterior <- dadosCEAP %>%
   filter(tipoDocumento==2) %>%
   group_by(sgUF) %>%
-  summarise(gastos=sum(valorLíquido))
+  summarise(gastos=sum(valorDocumento))
 ```
 
+Quem mais solicitou a CEAP no exterior:
 ```{r}
 # Quantidade (mais)
 estados_custos_exterior[order(-estados_custos_exterior$n),] %>%
   head(10) %>%
-  ggplot(aes(x = reorder(sgUF, n), y = n)) + geom_bar(stat="identity") + coord_flip()
+  ggplot(aes(x = reorder(sgUF, n), y = n)) + 
+  xlab("Estado") +
+  ylab("Utilização da CEAP") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
+Quem menos solicitou a CEAP no exterior:
 ```{r}
 # Quantidade (menos)
 estados_custos_exterior[order(estados_custos_exterior$n),] %>%
   head(10) %>%
-  ggplot(aes(x = reorder(sgUF, -n), y = n)) + geom_bar(stat="identity") + coord_flip()
+  ggplot(aes(x = reorder(sgUF, -n), y = n)) + 
+  xlab("Estado") +
+  ylab("Utilização da CEAP") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
+Quem gastou mais com CEAP:
 ```{r}
 # Reais (mais)
 estados_custos_reais_exterior[order(-estados_custos_reais_exterior$gastos),] %>%
   head(10) %>%
-  ggplot(aes(x = reorder(sgUF, gastos), y = gastos)) + geom_bar(stat="identity") + coord_flip()
+  ggplot(aes(x = reorder(sgUF, gastos), y = gastos)) + 
+  xlab("Estado") +
+  ylab("Gastos totais (em reais)") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
+Quem gastou menos com CEAP:
 ```{r}
 # Reais (menos)
 estados_custos_reais_exterior[order(estados_custos_reais_exterior$gastos),] %>%
   head(10) %>%
-  ggplot(aes(x = reorder(sgUF, -gastos), y = gastos)) + geom_bar(stat="identity") + coord_flip()
-```
-
-## Quais os deputados que mais ultrapassam o limite de CEAP do seu estado?
-```{r}
-dadosCEAP %>%
-  group_by(nomeParlamentar, sgUF) %>%
-  summarise(gastosDeputado=sum(valorLíquido)) %>%
-  left_join(limiteMensalCEAP, by=c("sgUF" = "UF")) %>%
-  mutate(limite_mensal = 24*limite_mensal) %>%
-  filter(gastosDeputado > limite_mensal)
-
-dadosCEAP %>%
-  mutate()
+  ggplot(aes(x = reorder(sgUF, -gastos), y = gastos)) + 
+  xlab("Estado") +
+  ylab("Gastos totais (em reais)") +
+  geom_bar(stat="identity") + 
+  coord_flip()
 ```
 
 
