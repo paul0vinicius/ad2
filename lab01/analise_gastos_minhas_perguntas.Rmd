@@ -1,0 +1,71 @@
+---
+title: 'Análise de Gastos de Deputados: Minhas perguntas'
+author: "Paulo Vinicius Soares"
+date: "6 de novembro de 2017"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 4
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(knitr)
+library(tidyverse)
+```
+
+# Introdução
+Esta análise é uma continuação da [análise dos gastos de deputados](https://rpubs.com/paul0vinicius/analise_gastos_deputados) feita utilizando os dados de gastos da _Cota Parlamentar_ dos deputados dos anos de 2015, 2016 e 2017. Abaixo temos mais 2 perguntas que iremos responder a partir dos nossos dados.
+
+Antes, iremos importar a nossa base de dados.
+```{r, message=FALSE, warning=FALSE}
+dadosCEAP <- read_csv(unz("../database/dadosCEAP.csv.zip", "dadosCEAP.csv")) %>%
+  mutate(diaMesAno = as.Date(stringr::str_sub(dataEmissao, 1, 10)))
+  
+dadosCEAP$valorGlosa <- as.numeric(sub(",", ".", dadosCEAP$valorGlosa, fixed = TRUE)) 
+limiteMensalCEAP <- read_csv("../database/limiteMensalCEAP.csv")
+```
+
+# Perguntas
+
+## 1. Existe correlação entre a quantidade de pessoas em um partido e o uso da CEAP? Ou seja, quanto mais deputados mais utilizações da CEAP?
+
+```{r}
+cor_final <- dadosCEAP %>%
+  filter(!sgPartido %in% NA) %>%
+  select(nomeParlamentar, sgPartido) %>%
+  unique() %>%
+  group_by(sgPartido) %>%
+  summarise(n_deputados = n())
+
+utilizacoes_CEAP <- dadosCEAP %>%
+  filter(!sgPartido %in% NA) %>%
+  group_by(sgPartido) %>%
+  summarise(n = n())
+
+cor_final %>%
+  left_join(utilizacoes_CEAP, by="sgPartido") %>%
+  select(n_deputados, n) %>%
+  cor() %>%
+  kable()
+```
+
+
+## 2. Qual o fornecedor mais beneficiado durante esses três anos de dados e quanto ele ganhou?
+
+```{r}
+lucro_fornecedor <- dadosCEAP %>%
+  group_by(fornecedor) %>%
+  summarise(lucroFornecedor = sum(valorDocumento))
+
+lucro_fornecedor[order(-lucro_fornecedor$lucroFornecedor),]
+```
+
+
+## 3. Quais foram os maiores gastos já feitos utilizando a CEAP?
+
+```{r}
+dadosCEAP[order(-dadosCEAP$valorDocumento),]
+```
+
