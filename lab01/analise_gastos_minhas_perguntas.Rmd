@@ -16,7 +16,7 @@ library(tidyverse)
 ```
 
 # Introdução
-Esta análise é uma continuação da [análise dos gastos de deputados](https://rpubs.com/paul0vinicius/analise_gastos_deputados) feita utilizando os dados de gastos da _Cota Parlamentar_ dos deputados dos anos de 2015, 2016 e 2017. Abaixo temos mais 2 perguntas que iremos responder a partir dos nossos dados.
+Esta análise é uma continuação da [análise dos gastos de deputados](https://rpubs.com/paul0vinicius/analise_gastos_deputados) feita utilizando os dados de gastos da _Cota Parlamentar_ dos deputados dos anos de 2015, 2016 e 2017. Abaixo temos mais 3 perguntas que iremos responder a partir dos nossos dados.
 
 Antes, iremos importar a nossa base de dados.
 ```{r, message=FALSE, warning=FALSE}
@@ -30,6 +30,8 @@ limiteMensalCEAP <- read_csv("../database/limiteMensalCEAP.csv")
 # Perguntas
 
 ## 1. Existe correlação entre a quantidade de pessoas em um partido e o uso da CEAP? Ou seja, quanto mais deputados mais utilizações da CEAP?
+
+Na pergunta número 1 da análise anterior alguns partidos apareceram com um gasto exorbitante comparado aos demais e uma das possíveis explicações seria a quantidade de parlamentares por partido. Para confirmar isso, o cálculo da correlação pode ser bem útil. Então fazemos o cálculo abaixo.
 
 ```{r}
 cor_final <- dadosCEAP %>%
@@ -51,21 +53,48 @@ cor_final %>%
   kable()
 ```
 
+Podemos perceber que a correlação foi altíssima, definida como muito forte, ou seja, há influência direta na quantidade de parlamentares por partidos e o número de solicitações da CEAP.
 
 ## 2. Qual o fornecedor mais beneficiado durante esses três anos de dados e quanto ele ganhou?
+
+A minha suspeita é que alguma empresa aérea esteja em primeiro lugar, pois a emissão de bilhetes aéreos foi o gasto mais comum na CEAP, de acordo com a análise passada. Vamos descobrir.
 
 ```{r}
 lucro_fornecedor <- dadosCEAP %>%
   group_by(fornecedor) %>%
-  summarise(lucroFornecedor = sum(valorDocumento))
+  summarise(lucroFornecedor = sum(valorDocumento)/1000000)
 
-lucro_fornecedor[order(-lucro_fornecedor$lucroFornecedor),]
+lucro_fornecedor[order(-lucro_fornecedor$lucroFornecedor),] %>%
+  head(10) %>%
+  ggplot(aes(x = reorder(fornecedor, lucroFornecedor), y = lucroFornecedor)) + 
+  xlab("Fornecedor") +
+  ylab("Lucro total (em milhões de reais)") +
+  scale_y_continuous(breaks = seq(0, 60, by = 5)) +
+  geom_bar(stat = "identity") +
+  coord_flip()
 ```
 
+A suspeita se confirma. A TAM - empresa aérea - domina o topo dos fornecedores que mais lucraram com a CEAP, na ordem de aproximadamente 57 milhões de reais. Seguida pela Gol, Azul e Avianca, com gastos de aproximadamente 40, 16 e 14 milhões de reais, respectivamente, as empresas aéreas estão no topo dos beneficiados.
 
-## 3. Quais foram os maiores gastos já feitos utilizando a CEAP?
+Temos ainda no top 10, um fornecedor que conserta aparelhos celulares, seguido da manutenção dos ramais, uma empresa de divulgação da atividade parlamentar, correios e uma empresa de vídeos (também com foco em divulgação de atividade parlamentar).
+
+## 3. Quais foram os maiores gastos já feitos utilizando a CEAP e quem foram seus autores?
+
+Eu pensei nessa pergunta ao analisar os gastos dos deputados por tipo de despesa e me deparar com inúmeros _outliers_ ultrapassando 100 mil reais em um único documento (!). Eu acredito que tenha sido com divulgação da atividade parlamentar, pois foi o tipo de gasto mais frequente segundo a última análise feita.
 
 ```{r}
-dadosCEAP[order(-dadosCEAP$valorDocumento),]
+dadosCEAP[order(-dadosCEAP$valorDocumento),] %>%
+  select(nomeParlamentar, valorDocumento, tipoDespesa, diaMesAno) %>%
+  head(20) %>%
+  ggplot(aes(x = reorder(nomeParlamentar, valorDocumento), y = valorDocumento)) + 
+  xlab("Deputado") +
+  ylab("Valor do gasto") +
+  geom_jitter(aes(colour = tipoDespesa)) +
+  coord_flip()
 ```
+
+Como podemos observar, o senhor Arnaldo Faria de Sá (PTB) gastou uma grana absurda em divulgação da atividade parlamentar em algum momento, aproximadamente 180 mil reais em duas ocasiões. Outros deputados como Arlindo Chinaglia, Cleber Verde, entre outros, gastaram aproximadamente 100 mil em ocasiões específicas e todas relacionadas à divulgação de atividade parlamentar.
+
+Bom, essa foi a análise dessa semana, espero que tenham gostado.
+Até a próxima.
 
