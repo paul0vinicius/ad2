@@ -1,0 +1,30 @@
+---
+title: "Usando Regressão Linear para Explicar a votação de Deputados"
+author: "Paulo Vinicius Soares"
+date: "22 de novembro de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+eleicoes2014 <- read.csv("../database/eleicoes2014.csv", encoding = "latin1") %>%
+  select(-cargo, -nome, -sequencial_candidato, -partido, -UF, -numero_candidato)
+
+selecionadas <- read.csv("../database/eleicoes2014.csv", encoding = "latin1") %>%
+  select(quantidade_doadores, quantidade_despesas, quantidade_fornecedores, votos)
+
+modelo <- lm(data = eleicoes2014, votos ~ .)
+
+modelo_selecionadas <- lm(data=selecionadas, votos ~ .)
+
+modelo %>%
+  summary()
+
+modelo_selecionadas %>%
+  summary()
+```
+
