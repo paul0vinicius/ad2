@@ -192,7 +192,7 @@ summary(modelo_agora_vai2)
 
 Comparando o primeiro modelo gerado e o último, temos:
 
-### Análise do F
+### Análise da estatística F
 
 Para os dois casos, o F possui um valor maior que 1 e o tamanho da amostra é maior que o número de preditores. A estatística F revela se há relação entre alguma variável preditora e a variável de saída. Para o primeiro caso, `F = 50.3` e para o segundo caso, `F = 327.2`. 
 
@@ -215,10 +215,6 @@ O R² é o quadrado da correlação entre variável resposta e o modelo linear a
 ## 4. Analise plots de resíduos e verifique se há tendências nos erros.
 
 ```{r}
-residuos <- resid(modelo_agora_vai2)
-
-plot(eleicoes2014$votos, residuos)
-
 modelo_final$residuals <- residuals(modelo_agora_vai2)
 
 nomes_variaveis <- c(names(modelo_final), "residuals")
@@ -226,9 +222,12 @@ nomes_variaveis <- c(names(modelo_final), "residuals")
 plotDF <- reshape2::melt(modelo_final[, nomes_variaveis], id="residuals")
 
 ggplot(plotDF, aes(x=value, y=residuals)) + 
-  geom_point(color="slateblue") + facet_wrap(~ variable)
+  geom_point(color="slateblue") + facet_wrap(~variable)
 
 ```
 
+Os gráficos de resíduos apontam alguns outliers, mas em geral os pontos se concentram próximos à 0 no eixo y, o que indica que o modelo não subestima ou superestima os valores.
 
 ## 5. Quais variáveis conseguem explicar melhor o número de votos?
+
+Pela análise dos _p valores_ podemos perceber que os valores mais baixos são das variáveis: *quantidade_doadores*, *total_receita*, *media_receita*,*recursos_de_outros_candidatos.comites*, *recursos_de_partidos*, *recursos_de_pessoas_fisicas*, *recursos_de_pessoas_juridicas*, *recursos_proprios*, *quantidade_despesas*, *quantidade_fornecedores*, *total_despesa* e *media_despesa*. O _p valor_ é um forte indicador de correlação entre a variável de saída e a variável analisada, pois aponta a probabilidade dessa correlação entre as variáveis ser aleatória. Ou seja, quanto menor essa probabilidade, maior a chance da correlação ser relevante ou existente.
