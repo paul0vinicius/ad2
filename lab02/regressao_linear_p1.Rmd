@@ -1,30 +1,117 @@
 ---
 title: "Usando Regressão Linear para Explicar a votação de Deputados"
 author: "Paulo Vinicius Soares"
-date: "22 de novembro de 2017"
-output: html_document
+date: "29 de novembro de 2017"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 4
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(knitr)
 library(tidyverse)
+library(DT)
 ```
+
+# Introdução
+Esta análise utilizará conceitos de regressão linear para tentar explicar as votações que os deputados receberam em 2014. Os dados foram extraídos do TSE e contemplam aproximadamente 5000 candidatos. As perguntas se encontram abaixo.
+
+Antes, vamos importar os dados referentes às eleições de 2014. Antes de utilizar os dados, é necessário fazer alguns ajustes, tais quais tratamento de NAs e alterar _factor_ para _character_.
+
+O tratamento de NAs escolhido para essa análise foi substituir todos os NAs pela mediana de valores daquela coluna para evitar a perda de dados.
 
 ```{r}
 eleicoes2014 <- read.csv("../database/eleicoes2014.csv", encoding = "latin1") %>%
-  select(-cargo, -nome, -sequencial_candidato, -partido, -UF, -numero_candidato)
+  mutate(nome = as.character(nome),
+         UF = as.character(UF),
+         partido = as.character(partido),
+         setor_economico_receita = as.character(setor_economico_receita),
+         setor_economico_despesa = as.character(setor_economico_despesa),
+         cargo = as.character(cargo),
+         sexo = as.character(sexo),
+         grau = as.character(grau),
+         estado_civil = as.character(estado_civil)
+         )
 
-selecionadas <- read.csv("../database/eleicoes2014.csv", encoding = "latin1") %>%
-  select(quantidade_doadores, quantidade_despesas, quantidade_fornecedores, votos)
+eleicoes2014$recursos_de_outros_candidatos.comites <- replace(eleicoes2014$recursos_de_outros_candidatos.comites, is.na(eleicoes2014$recursos_de_outros_candidatos.comites), median(eleicoes2014$recursos_de_outros_candidatos.comites, na.rm = TRUE))
 
-modelo <- lm(data = eleicoes2014, votos ~ .)
+eleicoes2014$recursos_de_partidos <- replace(eleicoes2014$recursos_de_partidos, is.na(eleicoes2014$recursos_de_partidos), median(eleicoes2014$recursos_de_partidos, na.rm = TRUE))
 
-modelo_selecionadas <- lm(data=selecionadas, votos ~ .)
+eleicoes2014$recursos_de_pessoas_físicas <- replace(eleicoes2014$recursos_de_pessoas_físicas, is.na(eleicoes2014$recursos_de_pessoas_físicas), median(eleicoes2014$recursos_de_pessoas_físicas, na.rm = TRUE))
 
-modelo %>%
-  summary()
+eleicoes2014$recursos_de_pessoas_juridicas <- replace(eleicoes2014$recursos_de_pessoas_juridicas, is.na(eleicoes2014$recursos_de_pessoas_juridicas), median(eleicoes2014$recursos_de_pessoas_juridicas, na.rm = TRUE))
 
-modelo_selecionadas %>%
+eleicoes2014$recursos_proprios <- replace(eleicoes2014$recursos_proprios, is.na(eleicoes2014$recursos_proprios), median(eleicoes2014$recursos_proprios, na.rm = TRUE))
+
+```
+
+# Perguntas
+
+Nesse primeiro momento, a análise terá caráter exploratório. Vamos verificar a influência das variáveis na variável de saída **votos**, além de analisar outros pontos referentes aos resíduos e a geração de um modelo usando regressão linear múltipla.
+
+## 1. Um modelo de regressão múltipla com todas as variáveis é plausível para explicar a variação em y (número de votos)?
+
+Primeiro, vejamos o panorama geral dos dados, ou seja, quais colunas o _data frame_ contém e o que significam.
+
+```{r}
+eleicoes2014 %>%
+  glimpse()
+```
+
+Existem 26 variáveis no nosso _data frame_ e o seus significados são:
+
+* "Sequencial_candidato" : (character) id do candidato 
+* "Nome":
+* "Numero_cadidato": (character)
+* "UF": (character)
+* "Partido": (character)
+* "Setor_economico_receita" : (character) setor econômico que mais doou (em quantidade de vezes) para o candidato;
+* "Quantidade_doacoes": (integer)
+* "Quantidade_doadores": (integer) número de doadores diferentes
+* "Total_receita": (double) soma em R$ das doações
+* "Media_receita": (double) média das doações
+* "recursos_de_outros_candidatos/comites": (double) quantia em R$ das doações provenientes de outros candidatos ou comite partidário
+* "Recursos_de_partidos": (double) quantia em R$ das doações provenientes de outros candidatos ou partidos
+* "Recursos_de_pessoas_físicas": (double) quantia em R$ das doações provenientes de outros CPFs
+* "Recursos_de_pessoas_juridicas": (double) quantia em R$ das doações provenientes de outros CNPJ
+* "Recursos_proprios": (double) quantia em R$ das doações provenientes do próprio candidato
+* "Votos": (integer) variável alvo. Se refere ao número de votos na campanha de 2014
+* "Quantidade_despesas": (integer)
+* "Quantidade_fornecedores": (integer) número de fornecedores/despesas diferentes
+* "Total_despesa": (double) soma em R$ das despesas de campanha
+* "Media_despesa": (double) média das despesas de campanha
+* "Setor_economico_despesa": (character)  setor econômico que o candidato mais gastou na campanha (em quantidade de vezes);
+* "Cargo": (character)
+* "Idade" : (int)
+* "Sexo":  (character)
+* "Grau": (character)
+* "Estado_civil": (character)
+
+De cara percebemos que algumas variáveis **não influenciam** na variável de saída, pois são apenas para identificação do deputado, tal como _nome_, *sequencial_candidato* e *numero_candidato*. _Cargo_ também não influencia no modelo, haja visto que todos os cargos são os mesmos (deputado federal).
+Algumas variáveis são lidas e tratadas como fatores de muitos níveis no modelo de regressão linear, o que atrapalha a leitura e interpretação deste.
+
+Podemos criar um modelo de regressão linear sem essas variáveis e ver o que acontece.
+
+
+```{r}
+eleicoes_filtradas <- eleicoes2014 %>%
+  select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -partido, -UF, -setor_economico_receita)
+
+modelo <- lm(data = eleicoes_filtradas, votos ~ .)
+
+modelo %>% 
   summary()
 ```
 
+## 2. Todas as variáveis são úteis para o modelo de regressão? Há variáveis redudantes?
+
+Não, algumas variáveis servem apenas para identificar quem é o deputado, como um ID. Inclusive, estes campo são redundantes: O *numero_cadidato*, o *sequencial_cadidato*. O nome também não é úti nesse modelo
+
+## 3. No caso de haver variáveis pouco explicativas e/ou redudantes, construa um novo modelo sem essas variáveis e o compare ao modelo com todas as variáveis (e.g. em termos de R2 e RSE).
+
+## 4. Analise plots de resíduos e verifique se há tendências nos erros. (
+
+## 5. Quais variáveis conseguem explicar melhor o número de votos?
