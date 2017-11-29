@@ -13,13 +13,12 @@ output:
 library(readr)
 library(knitr)
 library(tidyverse)
-library(DT)
 ```
 
 # Introdução
 Esta análise utilizará conceitos de regressão linear para tentar explicar as votações que os deputados receberam em 2014. Os dados foram extraídos do TSE e contemplam aproximadamente 5000 candidatos. As perguntas se encontram abaixo.
 
-Antes, vamos importar os dados referentes às eleições de 2014. Antes de utilizar os dados, é necessário fazer alguns ajustes, tais quais tratamento de NAs e alterar _factor_ para _character_.
+Antes, vamos importar os dados referentes às eleições de 2014. Antes de utilizar os dados, é necessário fazer alguns ajustes, tais quais tratamento de NAs e alterar os tipos de algumas variáveis de _factor_ para _character_.
 
 O tratamento de NAs escolhido para essa análise foi substituir todos os NAs pela mediana de valores daquela coluna para evitar a perda de dados.
 
@@ -98,7 +97,7 @@ Podemos criar um modelo de regressão linear sem essas variáveis e ver o que ac
 
 ```{r}
 eleicoes_filtradas <- eleicoes2014 %>%
-  select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -partido, -UF, -setor_economico_receita)
+  select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -setor_economico_despesa, -setor_economico_receita, -partido)
 
 modelo <- lm(data = eleicoes_filtradas, votos ~ .)
 
@@ -108,7 +107,43 @@ modelo %>%
 
 ## 2. Todas as variáveis são úteis para o modelo de regressão? Há variáveis redudantes?
 
-Não, algumas variáveis servem apenas para identificar quem é o deputado, como um ID. Inclusive, estes campo são redundantes: O *numero_cadidato*, o *sequencial_cadidato*. O nome também não é úti nesse modelo
+Não, algumas variáveis servem apenas para identificar quem é o deputado, como um ID. Inclusive, estes campo são redundantes: O *numero_cadidato*, o *sequencial_cadidato*. O nome também não é útil para a variável de saída nesse modelo.
+
+```{r}
+library(leaps)
+
+regsubsets.out <-
+    regsubsets(votos ~ .,
+               data = eleicoes_filtradas,
+               nbest = 1,       # 1 único modelo para cada cojunto de preditores
+               nvmax = NULL,    # NULL para não haver limite no número de variáveis preditoras
+               force.in = NULL, force.out = NULL,
+               method = "exhaustive",
+               really.big=T)
+
+summary.out <- summary(regsubsets.out)
+summary.out
+
+which.max(summary.out$adjr2)
+
+var <- summary.out$which[17,]
+
+indexes <- which(summary.out$which[17,])
+not_indexes <- which(!summary.out$which[17,])
+
+var_true <- names(var)[indexes]
+var_false <- names(var)[not_indexes]
+
+modelo_melhorado <- eleicoes_filtradas %>%
+  select(
+    -quantidade_doacoes, -idade, -grau, -estado_civil
+  )
+
+modelo_agora_vai <- lm(formula = votos ~ ., modelo_melhorado)
+summary(modelo_agora_vai)
+
+```
+
 
 ## 3. No caso de haver variáveis pouco explicativas e/ou redudantes, construa um novo modelo sem essas variáveis e o compare ao modelo com todas as variáveis (e.g. em termos de R2 e RSE).
 
