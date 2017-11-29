@@ -90,14 +90,13 @@ Existem 26 variáveis no nosso _data frame_ e o seus significados são:
 * "Estado_civil": (character)
 
 De cara percebemos que algumas variáveis **não influenciam** na variável de saída, pois são apenas para identificação do deputado, tal como _nome_, *sequencial_candidato* e *numero_candidato*. _Cargo_ também não influencia no modelo, haja visto que todos os cargos são os mesmos (deputado federal).
-Algumas variáveis são lidas e tratadas como fatores de muitos níveis no modelo de regressão linear, o que atrapalha a leitura e interpretação deste.
+Algumas variáveis são lidas e tratadas como fatores de muitos níveis no modelo de regressão linear, o que atrapalha a leitura e interpretação deste. Por esse motivo, essas variáveis também serão desconsideradas: *setor_economico_despesa* e *setor_economico_receita*.
 
 Podemos criar um modelo de regressão linear sem essas variáveis e ver o que acontece.
 
-
 ```{r}
 eleicoes_filtradas <- eleicoes2014 %>%
-  select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -setor_economico_despesa, -setor_economico_receita, -partido)
+  select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -setor_economico_despesa, -setor_economico_receita)
 
 modelo <- lm(data = eleicoes_filtradas, votos ~ .)
 
@@ -109,8 +108,15 @@ modelo %>%
 
 Não, algumas variáveis servem apenas para identificar quem é o deputado, como um ID. Inclusive, estes campo são redundantes: O *numero_cadidato*, o *sequencial_cadidato*. O nome também não é útil para a variável de saída nesse modelo.
 
+Formalizando um pouco mais, podemos utilizar um método de busca exaustiva no contexto de _seleção de variáveis_. Essa seleção de variáveis diagnostica quais variáveis estão associadas à variável resposta.
+
+Por questões de simplicidade na geração do modelo utilizando esse método vamos desconsiderar _partidos_ e _estados (UF)_, pois eles contém muitos níveis de fator fazendo com que haja demora no processamento dos dados.
+
 ```{r}
 library(leaps)
+
+eleicoes_filtradas <- eleicoes_filtradas %>%
+  select(-partido, -UF)
 
 regsubsets.out <-
     regsubsets(votos ~ .,
@@ -123,20 +129,45 @@ regsubsets.out <-
 
 summary.out <- summary(regsubsets.out)
 summary.out
+```
 
+A chamada ao `summary.out` mostra qual o melhor modelo para cada tamanho do subconjunto de variáveis. O melhor modelo é definido pelo R² ajustado - que é a capacidade que o modelo tem de explicar os dados - e _p valor_.
+
+Verificando qual modelo possui o melhor R², temos:
+
+```{r}
 which.max(summary.out$adjr2)
+```
 
+Quais variáveis estão presentes nesse modelo?
+
+```{r}
 var <- summary.out$which[17,]
-
+var
 indexes <- which(summary.out$which[17,])
 not_indexes <- which(!summary.out$which[17,])
 
 var_true <- names(var)[indexes]
 var_false <- names(var)[not_indexes]
+```
 
+No total se encontram 17 variáveis que têm alguma influência na variável de saída.
+
+```{r}
+var_true
+```
+
+As variáveis que não influenciam em _votos_:
+```{r}
+var_false
+```
+
+Vamos construir o modelo sem as variáveis que não influenciam em _votos_. Como _grau_ e *estado_civil* possuem níveis de fatores que também influenciam em _votos_, vamos conservar essas duas variáveis.
+
+```{r}
 modelo_melhorado <- eleicoes_filtradas %>%
   select(
-    -quantidade_doacoes, -idade, -grau, -estado_civil
+    -quantidade_doacoes, -idade
   )
 
 modelo_agora_vai <- lm(formula = votos ~ ., modelo_melhorado)
@@ -147,6 +178,57 @@ summary(modelo_agora_vai)
 
 ## 3. No caso de haver variáveis pouco explicativas e/ou redudantes, construa um novo modelo sem essas variáveis e o compare ao modelo com todas as variáveis (e.g. em termos de R2 e RSE).
 
-## 4. Analise plots de resíduos e verifique se há tendências nos erros. (
+Com o modelo construído anteriormente, apesar de _sexo_, _grau_ e *estado_civil* serem considerados relevantes, após uma análise no segundo modelo podemos perceber que seus _p valores_ são muito altos, de forma que podemos criar um novo modelo sem essas variáveis.
+
+```{r}
+modelo_final <- modelo_melhorado %>%
+  select(
+    -sexo, -grau, -estado_civil
+  )
+
+modelo_agora_vai2 <- lm(formula = votos ~ ., modelo_final)
+summary(modelo_agora_vai2)
+```
+
+Comparando o primeiro modelo gerado e o último, temos:
+
+### Análise do F
+
+Para os dois casos, o F possui um valor maior que 1 e o tamanho da amostra é maior que o número de preditores. A estatística F revela se há relação entre alguma variável preditora e a variável de saída. Para o primeiro caso, `F = 50.3` e para o segundo caso, `F = 327.2`. 
+
+### Análise do p valor
+
+Os _p valores_ do primeiro modelo em algumas variáveis é bem alto, indicando uma alta probabilidade de que estas não influenciem na variável de saída. É o caso de alguns partidos, _idade_, _sexo_, _grau_ e _estado civil_.
+
+No último modelo, todos os _p valores_ das variáveis estão muito baixos, o que apontam a influência muito forte destas na variável de saída.
+
+### Análise do RSE
+
+Para o primeiro modelo, temos `Residual standard error: 32230 on 4069 degrees of freedom` contra `Residual standard error: 32490 on 4139 degrees of freedom` do modelo final. Embora o segundo modelo apresente um _RSE_ maior, este apresenta mais graus de liberdade.
+
+### Análise do R² e R² ajustado
+
+O R² é o quadrado da correlação entre variável resposta e o modelo linear ajustado e mede a fração da variância explicada. Embora o primeiro modelo apresente um valor R² maior - `Multiple R-squared:  0.5034,	Adjusted R-squared:  0.4934` contra `Multiple R-squared:  0.4868,	Adjusted R-squared:  0.4854` do modelo final - Isso não significa que o modelo final está incorreto ou menos preciso, mostra apenas que o modelo se adequa menos aos dados, porém ganha em poder de generalização. Não devemos considerar apenas o R² para a seleção de variáveis, mas sempre aliar essa leitura ao _p valor_.
+
+(Revisar esse texto)
+
+## 4. Analise plots de resíduos e verifique se há tendências nos erros.
+
+```{r}
+residuos <- resid(modelo_agora_vai2)
+
+plot(eleicoes2014$votos, residuos)
+
+modelo_final$residuals <- residuals(modelo_agora_vai2)
+
+nomes_variaveis <- c(names(modelo_final), "residuals")
+
+plotDF <- reshape2::melt(modelo_final[, nomes_variaveis], id="residuals")
+
+ggplot(plotDF, aes(x=value, y=residuals)) + 
+  geom_point(color="slateblue") + facet_wrap(~ variable)
+
+```
+
 
 ## 5. Quais variáveis conseguem explicar melhor o número de votos?
