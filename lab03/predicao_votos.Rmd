@@ -1,0 +1,70 @@
+---
+title: "Usando predição para votos de deputados"
+author: "Paulo Vinicius Soares"
+date: "11 de dezembro de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(knitr)
+library(tidyverse)
+library(caret)
+source("importa_dados_deputados.R")
+```
+
+# Introdução
+
+Essa análise utilizará os mesmos dados sobre os deputados federais que foi utilizado na análise passada (link). Vamos importar os dados e mãos a obra.
+
+```{r}
+eleicoes2014 <- get_dados_deputados()
+# https://www.youtube.com/watch?v=c73Cu3TQnlg
+# https://www.youtube.com/watch?v=GMFewiplIbw
+# https://www.youtube.com/watch?v=oupft13Cms8 DEVE VER
+```
+
+# Perguntas
+
+Antes de responder as perguntas, devemos fazer a separação entre dados de treino e dados de teste.
+```{r}
+smp_size <- floor(.7*nrow(eleicoes2014))
+set.seed(788)
+train_id <- sample(seq_len(nrow(eleicoes2014)), size = smp_size)
+
+treino <- eleicoes2014[train_id,]
+teste <- eleicoes2014[-train_id,]
+```
+
+## 1. Usando todas as variáveis disponíveis, tune (usando validação cruzada): (i) um modelo de regressão Ridge, (ii) um modelo de regressão Lasso e (iii) um modelo KNN. Para os modelos de regressão linear, o parâmetro a ser tunado é o lambda (penalização dos coeficientes) e o KNN o número de vizinhos.
+
+
+```{r}
+treino <- treino %>% 
+  select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -setor_economico_despesa, -setor_economico_receita, -partido)
+modelo_ridge <- train(votos ~ ., data = treino, method = "ridge")
+modelo_lasso <- train(votos ~ ., data = treino, method = "lasso")
+
+fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+
+model.cv.lasso <- train(votos ~ ., data = treino, method = "lasso", trControl = fitControl)
+model.cv.ridge <- train(votos ~ ., data = treino, method = "ridge", trControl = fitControl)
+model.cv.knn <- train(votos ~ ., data = treino, method = "knn", trControl = fitControl)
+
+model.cv.lasso
+model.cv.ridge
+model.cv.knn
+```
+
+
+## 2. Compare os três modelos em termos do erro RMSE de validação cruzada.
+
+## 3. Quais as variáveis mais importantes segundo o modelo de regressão Ridge e Lasso?  Variáveis foram descartadas pelo Lasso? Quais?
+
+## 4. Re-treine o melhor modelo (usando os melhores valores de parâmetros encontrados em todos os dados, sem usar validação cruzada).
+
+## 5. Use esse último modelo treinado para prever os dados de teste que disponibilizaremos por meio da plataforma Kaggle.
