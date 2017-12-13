@@ -46,25 +46,74 @@ teste <- eleicoes2014[-train_id,]
 ```{r}
 treino <- treino %>% 
   select(-nome, -sequencial_candidato, -numero_cadidato, -cargo, -setor_economico_despesa, -setor_economico_receita, -partido)
-modelo_ridge <- train(votos ~ ., data = treino, method = "ridge")
-modelo_lasso <- train(votos ~ ., data = treino, method = "lasso")
 
-fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+#modelo_ridge <- train(votos ~ ., data = treino, method = "ridge", preProcess = "nzv", tuneLenght = 10)
+#modelo_lasso <- train(votos ~ ., data = treino, method = "lasso")
 
-model.cv.lasso <- train(votos ~ ., data = treino, method = "lasso", trControl = fitControl)
-model.cv.ridge <- train(votos ~ ., data = treino, method = "ridge", trControl = fitControl)
-model.cv.knn <- train(votos ~ ., data = treino, method = "knn", trControl = fitControl)
+fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 5)
 
+preProcessing <- c("scale", "center", "nzv")
+
+model.cv.lasso <- train(votos ~ ., data = treino, method = "lasso", trControl = fitControl, preProcess = preProcessing, tuneLength = 5)
+model.cv.ridge <- train(votos ~ ., data = treino, method = "ridge", trControl = fitControl, preProcess = preProcessing, tuneLength = 5)
+model.cv.knn <- train(votos ~ ., data = treino, method = "knn", trControl = fitControl, preProcess = preProcessing, tuneLenght = 5)
+```
+
+
+## 2. Compare os três modelos em termos do erro RMSE de validação cruzada.
+Comparar
+```{r}
 model.cv.lasso
 model.cv.ridge
 model.cv.knn
 ```
 
 
-## 2. Compare os três modelos em termos do erro RMSE de validação cruzada.
-
 ## 3. Quais as variáveis mais importantes segundo o modelo de regressão Ridge e Lasso?  Variáveis foram descartadas pelo Lasso? Quais?
+```{r}
+ggplot(varImp(model.cv.lasso))
+ggplot(varImp(model.cv.ridge))
+ggplot(varImp(model.cv.knn))
+```
+sumiram os babados aqui, acho que foi o negocio de recursos
 
 ## 4. Re-treine o melhor modelo (usando os melhores valores de parâmetros encontrados em todos os dados, sem usar validação cruzada).
+```{r}
+treino <- treino %>%
+  select(-recursos_de_outros_candidatos.comites, -recursos_proprios, -estado_civil, -UF, -sexo, - grau, -idade, -media_receita, -media_despesa)
+
+fitControl <- trainControl(method = "boot", number = 5, repeats = 5)
+
+model.cv.lasso <- train(votos ~ ., data = treino, method = "lasso")
+model.cv.ridge <- train(votos ~ ., data = treino, method = "ridge")
+model.cv.knn <- train(votos ~ ., data = treino, method = "knn")
+# gbt
+# randomforest (ver como usa para regressão)
+```
+
 
 ## 5. Use esse último modelo treinado para prever os dados de teste que disponibilizaremos por meio da plataforma Kaggle.
+
+## Ver predições
+
+```{r}
+predictions <- predict(model.cv.lasso, teste)
+
+diferenca <- teste$votos - predictions
+
+rmse <- function(residuos){
+  sqrt(mean(residuos**2))
+}
+
+rmse(diferenca)
+```
+
+## Estimando hiperparâmetros 
+
+```{r}
+lambdaGrid <- expand.grid(lambda = 10^seq(10, -2, length=100))
+
+model.cv <- train(votos ~ ., data = treino, method = "ridge", trControl = fitControl, preProcess = preProcessing, tuneGrid = lambdaGrid, na.action = na.omit)
+```
+
+
