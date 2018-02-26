@@ -14,7 +14,7 @@ library(readr)
 library(knitr)
 library(tidyverse)
 library(caret)
-source("importa_dados_deputados.R")
+source("utils/importa_dados_deputados.R")
 ```
 
 # Introdução
@@ -50,7 +50,7 @@ treino <- treino %>%
 #modelo_ridge <- train(votos ~ ., data = treino, method = "ridge", preProcess = "nzv", tuneLenght = 10)
 #modelo_lasso <- train(votos ~ ., data = treino, method = "lasso")
 
-fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 5)
+fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 5, sampling="up")
 
 preProcessing <- c("scale", "center", "nzv")
 

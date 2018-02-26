@@ -8,3 +8,7 @@ get_dados_deputados <- function(){
            recursos_proprios = replace(recursos_proprios, is.na(recursos_proprios), 0)
     )
 }
+
+get_kaggle_data <- function(){
+  read.csv("../database/train.csv", stringsAsFactors = FALSE)
+}
