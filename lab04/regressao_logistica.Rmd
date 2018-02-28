@@ -59,20 +59,48 @@ preProcessing <- c("scale", "center", "nzv")
 
 treino <- treino %>% 
   select(-nome, -ID, -numero_cadidato, -setor_economico_despesa, -setor_economico_receita, -partido)
+
+formula_modelo <- as.formula(situacao_final ~ .)
 ```
 
 
 Regressão logística
 ```{r}
-modelo_regressao <- train(situacao_final ~ ., data = treino, method="glm", family="binomial", 
+modelo_regressao <- train(formula_modelo, data = treino, method="glm", family="binomial", 
                           na.action = na.omit, trControl = fitControlOversampling, preProcess = preProcessing)
 
 summary(modelo_regressao)
 ```
 
+Árvore de decisão
+```{r}
+modelo_arvore <- train(formula_modelo, data=dados_treino_remastered, method="rpart", na.action = na.omit, 
+                       trControl = fitControlOversampling, preProcess = preProcessing, cp=0.001, maxdepth=20)
+
+modelo_arvore
+```
+
+Usando Adaboost
+```{r}
+dados_treino_remastered <- treino %>%
+  mutate(is_deputado = ifelse(descricao_ocupacao=="DEPUTADO",TRUE,FALSE), 
+         is_homem = ifelse(sexo=="MASCULINO",TRUE,FALSE), 
+         is_superior_completo=ifelse(grau=="SUPERIOR COMPLETO",TRUE,FALSE)) %>%
+  select(-UF,-total_despesa,-idade,-estado_civil,-descricao_cor_raca,-descricao_ocupacao,-sexo,-grau)
+modelo_adaboost <- train(formula_modelo, data=dados_treino_remastered, method="adaboost", na.action = na.omit, 
+                         preProcess = preProcessing)
+
+modelo_adaboost
+```
+
+```{r}
+predictions <- predict(modelo_arvore, teste)
+```
 
 
 3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.
+
+Eu achei bom e alto.
 
 4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo
 
