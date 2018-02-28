@@ -60,6 +60,11 @@ preProcessing <- c("scale", "center", "nzv")
 treino <- treino %>% 
   select(-nome, -ID, -numero_cadidato, -setor_economico_despesa, -setor_economico_receita, -partido)
 
+teste <- teste %>% 
+  mutate(is_deputado = ifelse(descricao_ocupacao=="DEPUTADO",TRUE,FALSE), 
+         is_homem = ifelse(sexo=="MASCULINO",TRUE,FALSE), 
+         is_superior_completo=ifelse(grau=="SUPERIOR COMPLETO",TRUE,FALSE))
+
 formula_modelo <- as.formula(situacao_final ~ .)
 ```
 
@@ -95,6 +100,8 @@ modelo_adaboost
 
 ```{r}
 predictions <- predict(modelo_arvore, teste)
+
+confusionMatrix(predictions, teste$situacao_final)
 ```
 
 
