@@ -12,3 +12,7 @@ get_dados_deputados <- function(){
 get_kaggle_data <- function(){
   read.csv("../database/train.csv", stringsAsFactors = FALSE)
 }
+
+get_kaggle_data_test <- function(){
+  read.csv("../database/test.csv", stringsAsFactors = FALSE)
+}
