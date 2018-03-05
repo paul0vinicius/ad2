@@ -210,8 +210,6 @@ Para o primeiro modelo, temos `Residual standard error: 32230 on 4069 degrees of
 
 O R² é o quadrado da correlação entre variável resposta e o modelo linear ajustado e mede a fração da variância explicada. Embora o primeiro modelo apresente um valor R² maior - `Multiple R-squared:  0.5034,	Adjusted R-squared:  0.4934` contra `Multiple R-squared:  0.4868,	Adjusted R-squared:  0.4854` do modelo final - Isso não significa que o modelo final está incorreto ou menos preciso, mostra apenas que o modelo se adequa menos aos dados, porém ganha em poder de generalização. Não devemos considerar apenas o R² para a seleção de variáveis, mas sempre aliar essa leitura ao _p valor_.
 
-(Revisar esse texto)
-
 ## 4. Analise plots de resíduos e verifique se há tendências nos erros.
 
 ```{r}
