@@ -1,5 +1,5 @@
 ---
-title: "Regressão Logística"
+title: "Predição de deputados eleitos"
 author: "Paulo Vinicius Soares"
 date: "26 de fevereiro de 2018"
 output: html_document
@@ -9,7 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Introdução
+
+Essa semana iremos utilizar mais uma vez os dados sobre deputados e tentaremos prever se este deputado será eleito ou não com base nos atributos que temos na nossa base de dados.
 
 ```{r}
 library(readr)
@@ -19,14 +21,23 @@ library(caret)
 source("../utils/importa_dados_deputados.R")
 ```
 
-Nessa atividade você irá usar seus conhecimentos sobre classificação para prever quais candidatos à Câmara de Deputados serão eleitos nas eleições de 2014. De forma específica faremos o seguinte:
+Vamos importar os dados dos deputados. Vamos retirar, além disso, algumas variáveis que não possuem tanta influência no modelo (Visto previamente em análise). Vamos adicionar três novos campos para otimizar a geração dos modelos: is_deputado, is_homem e is_superior_completo. Essas variáveis são derivadas de descricao_ocupacao, sexo e grau, respectivamente. Como estas variáveis possuem muitos fatores, o mais sensato é derivar os fatores que tem maior influência para reduzir o tempo de produção do modelo.
 
 ```{r}
-deputados <- get_kaggle_data()
+deputados <- get_kaggle_data() %>%
+  mutate(is_deputado = ifelse(descricao_ocupacao=="DEPUTADO",TRUE,FALSE), 
+         is_homem = ifelse(sexo=="MASCULINO",TRUE,FALSE), 
+         is_superior_completo=ifelse(grau=="SUPERIOR COMPLETO",TRUE,FALSE)) %>%
+  select(-nome, -numero_cadidato, -setor_economico_despesa, -setor_economico_receita,
+         -partido,-UF,-total_despesa,-idade,-estado_civil,-descricao_cor_raca,-descricao_ocupacao,-sexo,-grau)
+  
 ```
 
+# Perguntas
 
-1.Há desbalanceamento das classes (isto é, uma classe tem muito mais instâncias que outra)? Em que proporção? Quais efeitos colaterais o desbalanceamento de classes pode causar no classificador?
+## 1.Há desbalanceamento das classes (isto é, uma classe tem muito mais instâncias que outra)? Em que proporção? Quais efeitos colaterais o desbalanceamento de classes pode causar no classificador?
+
+Para responder essa pergunta utilizaremos um histograma que contará a frequência de deputados eleitos e não eleitos.
 
 ```{r}
 # Frequência de eleitos e não eleitos
@@ -34,83 +45,203 @@ deputados %>%
   ggplot(aes(situacao_final)) + geom_histogram(stat="count")
 ```
 
-Em primeira instância ocorre o perigo de enviesamento da previsão para uma das classes presentes nos dados. Como a proporção de deputados não eleitos para eleitos é de aproximadamente x para y, é muito provável que ele preveja "não eleito" para determinados casos. Isso pode ocorrer ao utilizar os algoritmos de Árvore de Decisão porque (Inserir explicação aqui sobre como o algoritmo funciona).
+Podemos observar que há um claro desbalanceamento entre as classes, havendo muito mais deputados não eleitos do que deputados eleitos. Os riscos que essa situação acarreta, em primeira instância, é o perigo de enviesamento da previsão para uma das classes presentes nos dados. Como a proporção de deputados eleitos para não eleitos é de aproximadamente 500 para 3500, é muito provável que ele preveja "não eleito" para determinados casos. Isso pode ocorrer ao utilizar os algoritmos de Árvore de Decisão. As soluções para esse tipo de problema são o _undersampling_ da classe majoritária ou o _oversampling_ da classe minoritária. O _undersampling_ consiste em retirar amostras da classe que possui maior frequência a fim de igualar as observações com a classe de menor frequência. O _oversampling_ consiste em aumentar o número de observações da amostra de menor frequência através de reamostragem. Aqui a estratégia adotada será o _oversampling_ para evitar a perda de informações.
 
-Soluções: Undersampling (Classes majoritárias) ou Oversampling (Classes minoritárias)
-Verificar pacote unbalanced
+## 2.Treine: um modelo de regressão logística, uma árvore de decisão e um modelo de adaboost. Tune esses modelos usando validação cruzada e controle overfitting se necessário, considerando as particularidades de cada modelo.
 
-2.Treine: um modelo de regressão logística, uma árvore de decisão e um modelo de adaboost. Tune esses modelos usando validação cruzada e controle overfitting se necessário, considerando as particularidades de cada modelo.
-
+Vamos utilizar o pacote do Caret para dividir os dados em treino e teste.
 ```{r}
 # Dividir os dados em treino e teste
-
+set.seed(123)
 dataPartition <- createDataPartition(y = deputados$situacao_final, p=0.75, list=FALSE)
 
 treino <- deputados[dataPartition,]
 teste <- deputados[-dataPartition,]
 ```
 
+Vamos adotar a estratégia de oversampling no próprio Caret utilizando o parâmetro _sampling = up_. 
 ```{r}
 # Validação cruzada
-fitControlUndersampling <- trainControl(method = "repeatedcv", number = 5, repeats = 5, sampling="down")
+# fitControlUndersampling <- trainControl(method = "repeatedcv", number = 5, repeats = 5, sampling="down")
 fitControlOversampling <- trainControl(method = "repeatedcv", number = 5, repeats = 5, sampling="up")
 
 preProcessing <- c("scale", "center", "nzv")
 
-treino <- treino %>% 
-  select(-nome, -ID, -numero_cadidato, -setor_economico_despesa, -setor_economico_receita, -partido)
-
-teste <- teste %>% 
-  mutate(is_deputado = ifelse(descricao_ocupacao=="DEPUTADO",TRUE,FALSE), 
-         is_homem = ifelse(sexo=="MASCULINO",TRUE,FALSE), 
-         is_superior_completo=ifelse(grau=="SUPERIOR COMPLETO",TRUE,FALSE))
-
-formula_modelo <- as.formula(situacao_final ~ .)
+formula_modelo <- as.formula(situacao_final ~ . - ID)
 ```
 
 
-Regressão logística
-```{r}
-modelo_regressao <- train(formula_modelo, data = treino, method="glm", family="binomial", 
-                          na.action = na.omit, trControl = fitControlOversampling, preProcess = preProcessing)
+### Regressão logística
 
+Utilizando o modelo de Regressão Logística, temos:
+```{r}
+# modelo_regressao <- train(formula_modelo, data = treino, method="glm", family="binomial",
+#                           na.action = na.omit, trControl = fitControlOversampling, preProcess = preProcessing)
+# saveRDS(modelo_regressao, file = "modelo_regressao.rds")
+modelo_regressao <- readRDS("modelo_regressao.rds")
+```
+
+### Árvore de decisão
+
+Utilizando o modelo de Árvore De Regressão, temos:
+```{r}
+# modelo_arvore <- train(formula_modelo, data=treino, method="rpart", na.action = na.omit,
+#                        trControl = fitControlOversampling, preProcess = preProcessing, cp=0.001, maxdepth=20)
+# 
+# saveRDS(modelo_arvore, file = "modelo_arvore.rds")
+modelo_arvore <- readRDS("modelo_arvore.rds")
+```
+
+### Adaboost
+
+Utilizando o modelo Adaboost, temos:
+```{r}
+
+# modelo_adaboost <- train(formula_modelo, data=treino, method="adaboost", na.action = na.omit,
+#                          preProcess = preProcessing)
+# saveRDS(modelo_adaboost, file = "modelo_adaboost.rds")
+
+modelo_adaboost <- readRDS("modelo_adaboost.rds")
+```
+
+## 3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.
+
+Esses parâmetros são calculados em termos de Verdadeiros Positivos (TP), Verdadeiros Negativos (TN), Falsos Positivos (FP) e Falsos Negativos (FN).
+
+A acurácia geralmente é dada no cálculo da matriz de confusão. Os demais parâmetros são calculados da seguinte forma:
+
+```{r}
+precision <- function(tp,fp){
+  tp/(tp+fp)
+}
+
+recall <- function(tp,fn){
+  tp/(tp+fn)
+}
+
+f_measure <- function(precision, recall) {
+  2*((precision*recall)/(precision+recall))
+}
+```
+
+Analisando cada modelo, temos:
+
+### Regressão logística
+
+Para os dados de treino, o modelo retorna os seguintes parâmetros:
+```{r}
 summary(modelo_regressao)
 ```
+De acordo com o modelo de regressão linear, os parâmetros que têm maior influência no modelo são _is deputado_, _is superior completo_ e _quantidade de doadores_, _media despesa_ e _quantidade fornecedores_, além disso, as demais variáveis também possuem leve influência no modelo. A análise foi feita considerando o _p valor_. Quanto mais baixo, maior a influência deste na variável resposta.
 
-Árvore de decisão
+Na validação utilizando os dados de teste, temos:
 ```{r}
-modelo_arvore <- train(formula_modelo, data=dados_treino_remastered, method="rpart", na.action = na.omit, 
-                       trControl = fitControlOversampling, preProcess = preProcessing, cp=0.001, maxdepth=20)
+predictions_regressao <- predict(modelo_regressao, teste)
+matriz_regressao <- confusionMatrix(predictions_regressao, teste$situacao_final)
+matriz_regressao
+```
+A acurácia nos é dada pelo próprio modelo, que é de 92%, com intervalo de confiança de 95%. A precisão e o Recall são dados abaixo:
 
-modelo_arvore
+```{r}
+prec_reg <- precision(tp = matriz_regressao$table[1], fp = matriz_regressao$table[3])
+prec_reg
 ```
 
-Usando Adaboost
 ```{r}
-dados_treino_remastered <- treino %>%
-  mutate(is_deputado = ifelse(descricao_ocupacao=="DEPUTADO",TRUE,FALSE), 
-         is_homem = ifelse(sexo=="MASCULINO",TRUE,FALSE), 
-         is_superior_completo=ifelse(grau=="SUPERIOR COMPLETO",TRUE,FALSE)) %>%
-  select(-UF,-total_despesa,-idade,-estado_civil,-descricao_cor_raca,-descricao_ocupacao,-sexo,-grau)
-modelo_adaboost <- train(formula_modelo, data=dados_treino_remastered, method="adaboost", na.action = na.omit, 
-                         preProcess = preProcessing)
+rec_reg <- recall(matriz_regressao$table[1], fn = matriz_regressao$table[2])
+rec_reg
+```
 
+```{r}
+f_measure(precision = prec_reg, recall = rec_reg)
+```
+
+
+### Árvores de Decisão
+
+Para os dados de treino, o modelo retorna os seguintes parâmetros:
+```{r}
+modelo_arvore
+```
+A acurácia para os dados de treino foi de aproximadamente 90%, de forma semelhante para os testes.
+
+Na validação utilizando os dados de teste, temos:
+```{r}
+predictions_arvore <- predict(modelo_arvore, teste)
+matriz_arvore <- confusionMatrix(predictions_arvore, teste$situacao_final)
+matriz_arvore
+```
+
+```{r}
+prec_arv <- precision(tp = matriz_arvore$table[1], fp = matriz_arvore$table[3])
+prec_arv
+```
+
+```{r}
+rec_arv <- recall(tp = matriz_arvore$table[1], fn = matriz_arvore$table[2])
+rec_arv
+```
+
+```{r}
+f_measure(precision = prec_arv, recall = rec_arv)
+```
+
+### Adaboost
+
+Para os dados de treino, o modelo retorna os seguintes parâmetros:
+```{r}
 modelo_adaboost
 ```
 
+Na validação utilizando os dados de teste, temos:
 ```{r}
-predictions <- predict(modelo_arvore, teste)
-
-confusionMatrix(predictions, teste$situacao_final)
+predictions_adaboost <- predict(modelo_adaboost, teste)
+matriz_adaboost <- confusionMatrix(predictions_adaboost, teste$situacao_final)
+matriz_adaboost
 ```
 
+```{r}
+prec_ada <- precision(tp = matriz_adaboost$table[1], fp = matriz_adaboost$table[3])
+prec_ada
+```
 
-3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.
+```{r}
+rec_ada <- recall(tp = matriz_adaboost$table[1], fn = matriz_adaboost$table[2])
+rec_ada
+```
 
-Eu achei bom e alto.
+```{r}
+f_measure(precision = prec_ada, recall = rec_ada)
+```
 
-4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo
+## 4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo.
 
-5.Envie seus melhores modelos à competição do Kaggle. Sugestões abaixo:
-  5.a Experimente outros modelos (e.g. SVM, RandomForests e GradientBoosting)
-  5.b Crie novos atributos.
+Em todos os modelos vistos, os atributos mais importantes parecem ser se o candidato já era deputado, o grau superior completo, a quantidade de doadores, a média da despesa nas eleições e a quantidade de fornecedores. Foram criados 3 novos atributos para agilizar o modelo e eliminar os fatores que não influenciavam na variável resposta. O tempo de produção do modelo reduziu drasticamente, além de elevar a acurácia deste.
+
+## 5. Envie os melhores modelos para o Kaggle:
+```{r}
+# dados_teste <- get_kaggle_data_test() %>%
+#   mutate(is_deputado = ifelse(descricao_ocupacao=="DEPUTADO",TRUE,FALSE),
+#          is_homem = ifelse(sexo=="MASCULINO",TRUE,FALSE),
+#          is_superior_completo=ifelse(grau=="SUPERIOR COMPLETO",TRUE,FALSE)) %>%
+#   select(-nome, -numero_cadidato, -setor_economico_despesa, -setor_economico_receita,
+#          -partido,-UF,-total_despesa,-idade,-estado_civil,-descricao_cor_raca,-descricao_ocupacao,-sexo,-grau)
+# 
+# 
+# predictions_regressao_teste_kaggle <- predict(modelo_regressao, dados_teste)
+# 
+# dados_teste$situacao_final <- predictions_regressao_teste_kaggle
+# 
+# dados_teste %>%
+#   select(ID, prediction = situacao_final) %>%
+#   write.csv("respostas.csv", row.names = FALSE)
+# 
+# pred_adaboost <- predict(modelo_adaboost, dados_teste)
+# dados_teste$situacao_final <- pred_adaboost
+ model_rf <- train(formula_modelo, data = treino, method="rf", na.action = na.omit, 
+                   trControl = fitControlOversampling, preProcess = preProcessing, prox = TRUE, allowParallel=TRUE)
+pred1 <- predict(model_rf, dados_teste)
+dados_teste$situacao_final <- pred1
+
+```
+
