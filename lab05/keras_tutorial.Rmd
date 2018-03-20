@@ -1,0 +1,421 @@
+---
+title: 'keras: Deep Learning em R'
+author: "Paulo Vinícius Soares"
+date: "14 de março de 2018"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introdução
+
+Nesse tutorial nós vamos aprender a construir um _Multi-Layer Perceptron (MLP)_. Todo o conhecimento reproduzido aqui foi baseado nesse [tutorial](https://www.datacamp.com/community/tutorials/keras-r-deep-learning). Como sabemos, *aprendizado de máquina* é um subcampo da Ciência da Computação e _Deep Learning_ pode ser enxergado como um subcampo de *aprendizado de máquina* baseado em um conjunto de algoritmos que foram inspirados na estrutura e funcionamento do cérebro humano, chamado frequentemente de Redes Neurais Artificiais (RNA).
+
+Nós vamos pular algumas partes do tutorial original sobre os demais pacotes de _Deep Learning_ e as diferenças entre _kerasR_ e _keras_. Para mais detalhes, visite o [tutorial](https://www.datacamp.com/community/tutorials/keras-r-deep-learning).
+
+# Tópicos
+
+O tutorial abordará os seguintes tópicos:
+
+- Como explorar e pré-processar os dados que você carregar do arquivo CSV: Normalizar e dividir em dados de treino e teste.
+
+- Construção do modelo de _Deep Learning_ propriamente dito, _Multi-Layer Perceptron (MLP)_ para classificação de várias classes.
+
+- Como compilar e ajustar o modelo para os seus dados, além de visualizar o histórico de treinamento.
+
+- Predizer os valores alvo baseado nos dados de teste.
+
+- Por fim, evoluir e refinar o seu modelo, interpretando os resultados a fim de melhorar a performance. Para isso adicionaremos camadas (ocultas ou não) e veremos como ajustar os parâmetros de otimização para obter resultados melhores.
+
+- Como salvar e carregar o modelo.
+
+## Inicializando o ambiente e carregando bibliotecas
+Vamos primeiro instalar e carregar o keras com os seguintes comandos abaixo:
+
+```{r}
+#devtools::install_github("rstudio/keras")
+#install.packages("keras")
+library(keras)
+
+#install.packages("tensorflow")
+library(tensorflow)
+#install_tensorflow()
+```
+
+## Carregando os dados
+
+Vamos utilizar os dados do Iris, do repositório UCI de _Machine Learning_.
+```{r}
+iris <- read.csv(url("http://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"), header = FALSE)
+```
+
+Antes de tudo é preciso normalizar os dados.
+```{r}
+# Build your own `normalize()` function
+normalize <- function(x) {
+  num <- x - min(x)
+  denom <- max(x) - min(x)
+  return (num/denom)
+}
+
+# Normalize the `iris` data
+iris_norm <- as.data.frame(lapply(iris[1:4], normalize))
+
+iris[,5] <- as.numeric(iris[,5]) -1
+
+# Turn `iris` into a matrix
+iris <- as.matrix(iris)
+
+# Set `iris` `dimnames` to `NULL`
+dimnames(iris) <- NULL
+
+# Normalize the `iris` data
+iris[,1:4] <- normalize(iris[,1:4])
+```
+
+## Pré-processamento dos dados
+
+Antes de tudo, vamos setar uma semente para que os resultados possam ser reproduzidos novamentes. É o que chamamos de pseudoaleatoriedade. Vamos também determinar o tamanho da amostra:
+```{r}
+set.seed(1250)
+
+# Determine sample size
+ind <- sample(2, nrow(iris), replace=TRUE, prob=c(0.67, 0.33))
+
+# Split the `iris` data
+iris.training <- iris[ind==1, 1:4]
+iris.test <- iris[ind==2, 1:4]
+
+# Split the class attribute
+iris.trainingtarget <- iris[ind==1, 5]
+iris.testtarget <- iris[ind==2, 5]
+```
+
+### One-hot encoding
+
+Quando se trabalha com modelos que envolvem problemas de classificação multiclasse utilizando redes neurais, geralmente é uma boa prática transformar o seu atributo alvo de um vetor que contenha valores para cada valor da classe em uma matriz de booleanos para cada valor da classe e se uma dada instância tem aquele valor de classe ou não. O keras tem um pacote que faz tudo isso para você. Utilizando o `to_categorical()`, o retorno é exatamente essa matriz.
+```{r}
+# One hot encode training target values
+iris.trainLabels <- to_categorical(iris.trainingtarget)
+
+# One hot encode test target values
+iris.testLabels <- to_categorical(iris.testtarget)
+
+# Print out the iris.testLabels to double check the result
+print(iris.testLabels)
+```
+
+Podemos ver acima a matriz gerada dos booleanos.
+
+## Construindo o modelo
+
+Utilizando a função `keras_model_sequential()`, inicializamos o modelo. Vamos utilizar a camada de ativação _relu_ para ganhar um pouco de familiaridade com redes neurais, por se tratar de uma camada relativamente simples. Na camada de saída, o _softmax_ foi escolhido a fim de garantir que os valores de saída gerados sejam entre 0 e 1 possibilitando que estes sejam usados como probabilidades.
+```{r}
+model <- keras_model_sequential() %>%
+    layer_dense(units = 8, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dense(units = 3, activation = 'softmax')
+```
+
+Observações: A camada de saída cria 3 valores de saída, um para cada classe de Iris. A primeira camada tem um atributo, _input_shape_ igual a 4 que é o numero de colunas existentes na matriz dos dados de treino.
+
+Por fim, podemos observar mais detalhes do modelo fazendo consultas aos seus atributos:
+```{r}
+# Print a summary of a model
+summary(model)
+
+# Get model configuration
+get_config(model)
+
+# Get layer configuration
+get_layer(model, index = 1)
+
+# List the model's layers
+model$layers
+
+# List the input tensors
+model$inputs
+
+# List the output tensors
+model$outputs
+```
+
+
+## Compilando e ajustando o modelo 
+
+Agora que a arquitetura do modelo já foi inicializada, é hora de compilar e ajustar o modelo. Para fazer isso, vamos configurar o modelo utilizando o otimizador `adam` e a função de perda `categorical_crossentropy`. Além disso, vamos monitorar a acurácia durante o treino utilizando a métrica `accuracy` para os argumentos de métricas.
+
+```{r}
+model %>% compile(
+     loss = 'categorical_crossentropy',
+     optimizer = 'adam',
+     metrics = 'accuracy'
+ )
+```
+
+Dependendo do algoritmo que será utilizado é interessante tunar determinados parâmetros. A escolha da função de perda depende de qual tarefa se quer executar.
+
+Agora, vamos ajustar o modelo de acordo com os dados:
+```{r}
+model %>% fit(
+     iris.training, 
+     iris.trainLabels, 
+     epochs = 200, 
+     batch_size = 5, 
+     validation_split = 0.2
+   )
+```
+
+## Visualizar o histórico de treinamento de modelos
+
+É possível visualizar o histórico de treinamento do modelo, a parte de ajuste dos dados. Pode ser feito da seguinte forma:
+
+```{r}
+# Store the fitting history in `history` 
+history <- model %>% fit(
+     iris.training, 
+     iris.trainLabels, 
+     epochs = 200,
+     batch_size = 5, 
+     validation_split = 0.2
+ )
+
+# Plot the history
+plot(history)
+```
+
+Uma outra coisa boa é poder visualizar os parâmetros de perda e acurácia graficamente, indicadas pelos atributos `loss` e `acc`, para os dados de treino e `val_loss` e `val_acc` para os dados de teste/validação.
+
+Vamos visualizá-los separadamente a fim de melhor compreensão:
+
+Primeiramente, visualizaremos o gráfico de perdas.
+```{r}
+# Plot the model loss of the training data
+plot(history$metrics$loss, main="Model Loss", xlab = "epoch", ylab="loss", col="blue", type="l")
+
+# Plot the model loss of the test data
+lines(history$metrics$val_loss, col="green")
+
+# Add legend
+legend("topright", c("train","test"), col=c("blue", "green"), lty=c(1,1))
+```
+
+Em seguida, visualizaremos o gráfico de acurácia:
+
+```{r}
+# Plot the accuracy of the training data 
+plot(history$metrics$acc, main="Model Accuracy", xlab = "epoch", ylab="accuracy", col="blue", type="l")
+
+# Plot the accuracy of the validation data
+lines(history$metrics$val_acc, col="green")
+
+# Add Legend
+legend("bottomright", c("train","test"), col=c("blue", "green"), lty=c(1,1))
+```
+
+Algumas ressalvas que devem ser feitas:
+
+- Se a acurácia dos de dados de treino continuam a melhorar enquanto a dos dados de validação pioram, isso é um sinal de **overfitting**, o modelo começa a se super ajustar aos dados.
+
+- Se a tendência para a acurácia em ambos os _datasets_ ainda está aumentando para os últimos períodos, é possível perceber que o modelo ainda não aprendeu tudo o que deveria dos dados.
+
+## Rótulos de predição dos novos dados
+
+Agora que o novo modelo foi criado, compilado e ajustado aos dados, chegou a hora de finalmente usar o modelo para predizer os rótulos para os dados de teste, `iris.test`. Para isso, vamos utilizar a função `predict()` aliada à matriz de confusão com uma ajuda da função `table()` com o intuito de melhorar a leitura.
+
+```{r}
+# Predict the classes for the test data
+classes <- model %>% predict_classes(iris.test, batch_size = 128)
+
+# Confusion matrix
+table(iris.testtarget, classes)
+```
+
+## Evoluindo o modelo
+
+Utilizando a função `evaluate()` para isto, vamos passar os dados de teste, os rótulos de teste e definir o tamanho do _batch_. Vamos armazenar tudo isso em uma variável de _score_.
+
+```{r}
+# Evaluate on test data and labels
+score <- model %>% evaluate(iris.test, iris.testLabels, batch_size = 128)
+
+# Print the score
+print(score)
+```
+
+Podemos verificar o _score_ através da função `print()` que nos retorna o valor de perda e a métrica selecionada (Escolhemos a acurácia lá em cima).
+
+## Tunando o modelo
+
+É, provavelmente, uma das tarefas que mais tomará tempo durante a produção de modelos. Aperfeiçoar o modelo não é uma tarefa tão trivial quanto o do problema utilizado nesse exemplo. Existem três formas de fazer essa melhoria, e são elas: Adição de novas camadas, unidades ocultas e parâmetros de otimização.
+
+### Adição de novas camadas
+
+Vamos ver o que acontece ao adicionar novas camadas no modelo e iremos comparar o score com o modelo obtido anteriormente.
+
+```{r}
+# Initialize the sequential model
+model <- keras_model_sequential() 
+
+# Add layers to model
+model %>% 
+    layer_dense(units = 8, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dense(units = 5, activation = 'relu') %>% 
+    layer_dense(units = 3, activation = 'softmax')
+
+# Compile the model
+model %>% compile(
+     loss = 'categorical_crossentropy',
+     optimizer = 'adam',
+     metrics = 'accuracy'
+ )
+
+# Fit the model to the data
+model %>% fit(
+     iris.training, iris.trainLabels, 
+     epochs = 200, batch_size = 5, 
+     validation_split = 0.2
+ )
+
+# Evaluate the model
+score <- model %>% evaluate(iris.test, iris.testLabels, batch_size = 128)
+
+# Print the score
+print(score)
+```
+
+
+### Unidades ocultas
+
+Verificando o efeito das unidades ocultas na arquitetura do modelo, temos:
+
+```{r}
+# Initialize a sequential model
+model <- keras_model_sequential() 
+
+# Add layers to the model
+model %>% 
+    layer_dense(units = 28, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dense(units = 3, activation = 'softmax')
+
+# Compile the model
+model %>% compile(
+     loss = 'categorical_crossentropy',
+     optimizer = 'adam',
+     metrics = 'accuracy'
+ )
+
+# Fit the model to the data
+model %>% fit(
+     iris.training, iris.trainLabels, 
+     epochs = 200, batch_size = 5, 
+     validation_split = 0.2
+ )
+
+# Evaluate the model
+score <- model %>% evaluate(iris.test, iris.testLabels, batch_size = 128)
+
+# Print the score
+print(score)
+```
+
+Em geral essa não é a melhor otimização devido à possibilidade de **overfitting** para pouca quantidade de dados. Por esse motivo, é melhor utilizar uma rede pequena para _datasets_ pequenos como este.
+
+Vamos verificar o que acontece ao adicionar unidades ocultas.
+```{r}
+# Initialize the sequential model
+model <- keras_model_sequential() 
+
+# Add layers to the model
+model %>% 
+    layer_dense(units = 28, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dense(units = 3, activation = 'softmax')
+
+# Compile the model
+model %>% compile(
+     loss = 'categorical_crossentropy',
+     optimizer = 'adam',
+     metrics = 'accuracy'
+ )
+
+# Save the training history in the history variable
+history <- model %>% fit(
+  iris.training, iris.trainLabels, 
+  epochs = 200, batch_size = 5, 
+  validation_split = 0.2
+ )
+
+# Plot the model loss
+plot(history$metrics$loss, main="Model Loss", xlab = "epoch", ylab="loss", col="blue", type="l")
+lines(history$metrics$val_loss, col="green")
+legend("topright", c("train","test"), col=c("blue", "green"), lty=c(1,1))
+
+# Plot the model accuracy
+plot(history$metrics$acc, main="Model Accuracy", xlab = "epoch", ylab="accuracy", col="blue", type="l")
+lines(history$metrics$val_acc, col="green")
+legend("bottomright", c("train","test"), col=c("blue", "green"), lty=c(1,1))
+```
+
+### Otimização de parâmetros
+
+Existem parâmetros que podem ser passados para a compilação que melhoram os resultados obtidos. Até agora utilizamos o `adam`, porém existem inúmeros algoritmos que podem ser utilizados. Um deles é o gradiente descendente estocástico. Vamos ver o que acontece ao utilizá-lo?
+
+```{r}
+# Initialize a sequential model
+model <- keras_model_sequential() 
+
+# Build up your model by adding layers to it
+model %>% 
+    layer_dense(units = 8, activation = 'relu', input_shape = c(4)) %>% 
+    layer_dense(units = 3, activation = 'softmax')
+
+# Define an optimizer
+sgd <- optimizer_sgd(lr = 0.01)
+
+# Use the optimizer to compile the model
+model %>% compile(optimizer=sgd, 
+                  loss='categorical_crossentropy', 
+                  metrics='accuracy')
+
+# Fit the model to the training data
+model %>% fit(
+     iris.training, iris.trainLabels, 
+     epochs = 200, batch_size = 5, 
+     validation_split = 0.2
+ )
+
+# Evaluate the model
+score <- model %>% evaluate(iris.test, iris.testLabels, batch_size = 128)
+
+# Print the loss and accuracy metrics
+print(score)
+```
+
+
+## Salvar, carregar e exportar o seu modelo
+
+As funções para salvar e carregar os modelos são bem simples: `save_model_hdf5()` e `load_model_hdf5()`. De forma adicional, também é possível salvar e carregar os pesos dos modelos com as funções `save_model_weights_hdf5()` e `load_model_weights_hdf5()`.
+
+```{r}
+# save_model_hdf5(model, "my_model.h5")
+# model <- load_model_hdf5("my_model.h5")
+# save_model_weights_hdf5("my_model_weights.h5")
+# model %>% load_model_weights_hdf5("my_model_weights.h5")
+```
+
+Além disso, também é possível exportar o seu modelo como JSON ou YAML.
+
+```{r}
+# json_string <- model_to_json(model)
+# model <- model_from_json(json_string)
+# 
+# yaml_string <- model_to_yaml(model)
+# model <- model_from_yaml(yaml_string)
+```
+
+Então é isto, esse foi o tutorial sobre _Machine Learning_. Espero que tenham gostado, pessoal! Até a próxima.
